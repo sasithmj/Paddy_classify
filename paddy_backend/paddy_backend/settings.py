@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-9fxtcpbb#^6n7evj=%-hjnd9zfy_b6&aoxdpf@(mfq$ee!gaob
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '172.17.75.206', '172.20.10.3','192.168.8.194']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '172.17.75.206', '172.20.10.3','192.168.8.194','172.20.10.6']
 
 # CORS_ALLOWED_ORIGINS = [
 #     "http://localhost:3000",  # Flutter app

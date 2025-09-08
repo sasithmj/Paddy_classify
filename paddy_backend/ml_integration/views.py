@@ -10,7 +10,7 @@ from skimage.feature import graycomatrix, graycoprops, hog
 from django.conf import settings
 
 # Load trained model
-rf_model = joblib.load("ml_models/paddy_rf_model.pkl")
+rf_model = joblib.load("ml_models/best_paddy_rf_model.pkl")
 
 DISEASE_NAMES = {
     0: "Sheath Rot",

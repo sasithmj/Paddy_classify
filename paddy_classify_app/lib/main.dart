@@ -123,7 +123,7 @@ class _PaddyDiseaseClassifierPageState
       // Create multipart request
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://172.17.75.206:8000/api/predict/'),
+        Uri.parse('http://172.20.10.6:8000/api/predict/'),
       );
 
       // Add paddy image to the request
