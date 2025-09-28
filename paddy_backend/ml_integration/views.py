@@ -20,99 +20,70 @@ DISEASE_NAMES = {
     4: "Rice Blast",
 }
 
-def extract_image_features(image_path, IMG_SIZE=(256, 256)):
+import cv2
+import numpy as np
+from skimage.feature import graycomatrix, graycoprops, hog
+
+def extract_image_features(image_path, IMG_SIZE=(128,128)):
     """
-    Extract comprehensive image features combining texture, color, shape, histogram, and HOG features.
-    This function matches exactly what was used during model training.
+    Optimized feature extractor for paddy disease images.
+    Keeps the same name and return type as the original function.
     
     Parameters:
     image_path (str): Path to the image file
-    IMG_SIZE (tuple): Size to resize the image to (default: (256, 256))
-    
+    IMG_SIZE (tuple): Size to resize the image to (default: (128, 128))
+
     Returns:
     np.array: Array of extracted features
     """
-    # Load image
-    image = cv2.imread(image_path)
-    if image is None:
-        print(f"Error: Image not found - {image_path}")
+    img = cv2.imread(image_path)
+    if img is None:
+        print(f"Error: Could not read image - {image_path}")
         return None
+    
+    # Convert to RGB and resize
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img_resized = cv2.resize(img, IMG_SIZE, interpolation=cv2.INTER_AREA)
 
-    # Resize for consistency
-    resized_image = cv2.resize(image, IMG_SIZE)
+    # HSV summary stats
+    hsv = cv2.cvtColor(img_resized, cv2.COLOR_RGB2HSV)
+    h_mean, s_mean, v_mean = np.mean(hsv, axis=(0,1))
+    h_std, s_std, v_std = np.std(hsv, axis=(0,1))
 
-    # Convert BGR to RGB
-    rgb_image = cv2.cvtColor(resized_image, cv2.COLOR_BGR2RGB)
+    # Reduced color histograms (normalized, fewer bins for efficiency)
+    hist_bins = 32
+    hist_r = cv2.calcHist([img_resized],[0],None,[hist_bins],[0,256]).flatten()
+    hist_g = cv2.calcHist([img_resized],[1],None,[hist_bins],[0,256]).flatten()
+    hist_b = cv2.calcHist([img_resized],[2],None,[hist_bins],[0,256]).flatten()
+    hist = np.concatenate([hist_r, hist_g, hist_b])
+    hist = hist / (hist.sum() + 1e-8)
 
-    # Convert to grayscale
-    gray_image = cv2.cvtColor(resized_image, cv2.COLOR_BGR2GRAY)
+    # GLCM (on quantized grayscale)
+    gray = cv2.cvtColor(img_resized, cv2.COLOR_RGB2GRAY)
+    glcm_levels = 8
+    q = (gray * (glcm_levels / 256.0)).astype('uint8')
+    glcm = graycomatrix(q, distances=[1], angles=[0], 
+                        levels=glcm_levels, symmetric=True, normed=True)
+    contrast = graycoprops(glcm, 'contrast')[0,0]
+    correlation = graycoprops(glcm, 'correlation')[0,0]
+    energy = graycoprops(glcm, 'energy')[0,0]
+    homogeneity = graycoprops(glcm, 'homogeneity')[0,0]
+    glcm_feats = np.array([contrast, correlation, energy, homogeneity])
 
-    # Apply Adaptive Histogram Equalization (CLAHE)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    enhanced_image = clahe.apply(gray_image)
-
-    # Apply Gaussian Blur
-    blurred_image = cv2.GaussianBlur(enhanced_image, (5, 5), 0)
-
-    # Texture Features (GLCM)
-    glcm = graycomatrix(blurred_image, distances=[1], angles=[0], levels=256, symmetric=True, normed=True)
-    contrast = graycoprops(glcm, 'contrast')[0, 0]
-    correlation = graycoprops(glcm, 'correlation')[0, 0]
-    energy = graycoprops(glcm, 'energy')[0, 0]
-    homogeneity = graycoprops(glcm, 'homogeneity')[0, 0]
-
-    # Color Features (HSV)
-    hsv_image = cv2.cvtColor(resized_image, cv2.COLOR_BGR2HSV)
-    h_mean, s_mean, v_mean = np.mean(hsv_image, axis=(0, 1))
-    h_std, s_std, v_std = np.std(hsv_image, axis=(0, 1))
-
-    # Shape Features
-    edges = cv2.Canny(blurred_image, 100, 200)
-    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    num_contours = len(contours)
-    avg_contour_area = np.mean([cv2.contourArea(c) for c in contours]) if contours else 0
-    avg_contour_perimeter = np.mean([cv2.arcLength(c, True) for c in contours]) if contours else 0
-
-    # Elongation Ratio
-    if contours:
-        largest_contour = max(contours, key=cv2.contourArea)
-        x, y, w, h = cv2.boundingRect(largest_contour)
-        elongation_ratio = h / w if w != 0 else 0
-        major_axis_length = max(w, h)
-    else:
-        elongation_ratio = 0
-        major_axis_length = 0
-
-    # Histogram Features (Color Distribution)
-    hist_r = cv2.calcHist([rgb_image], [0], None, [256], [0, 256])
-    hist_g = cv2.calcHist([rgb_image], [1], None, [256], [0, 256])
-    hist_b = cv2.calcHist([rgb_image], [2], None, [256], [0, 256])
-
-    # Normalize histogram features
-    hist_r = cv2.normalize(hist_r, hist_r).flatten()
-    hist_g = cv2.normalize(hist_g, hist_g).flatten()
-    hist_b = cv2.normalize(hist_b, hist_b).flatten()
-
-    # Combine histogram features
-    hist_features = np.concatenate((hist_r, hist_g, hist_b))
-
-    # HOG Feature Extraction
-    hog_features = hog(gray_image, orientations=9, pixels_per_cell=(8, 8),
-                      cells_per_block=(2, 2), block_norm='L2-Hys', feature_vector=True)
-
-    # Basic features
-    basic_features = np.array([
-        contrast, correlation, energy, homogeneity,
-        h_mean, s_mean, v_mean,
-        h_std, s_std, v_std,
-        num_contours, avg_contour_area, avg_contour_perimeter,
-        elongation_ratio, major_axis_length
-    ])
+    # HOG features (reduced dimensionality)
+    hog_feats = hog(gray, orientations=6, pixels_per_cell=(16,16),
+                    cells_per_block=(2,2), block_norm='L2-Hys', feature_vector=True)
 
     # Combine all features
-    combined_features = np.concatenate((basic_features, hist_features, hog_features))
-    
+    combined_features = np.concatenate([
+        np.array([h_mean, s_mean, v_mean, h_std, s_std, v_std]),
+        glcm_feats,
+        hist,
+        hog_feats
+    ])
+
     return combined_features
+
 
 
 @csrf_exempt

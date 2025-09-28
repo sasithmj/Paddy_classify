@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:share/share.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ResultsPage extends StatelessWidget {
@@ -153,10 +153,10 @@ class ResultsPage extends StatelessWidget {
                           Container(
                             height: 8,
                             width: MediaQuery.of(context).size.width *
-                                0.8 * // Account for padding
-                                (confidence / 100),
+                                0.8 *
+                                confidence,
                             decoration: BoxDecoration(
-                              color: _getConfidenceColor(confidence),
+                              color: _getConfidenceColor(confidence * 100),
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
@@ -164,11 +164,11 @@ class ResultsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '${confidence.toStringAsFixed(1)}%',
+                        '${(confidence * 100).toStringAsFixed(1)}%',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: _getConfidenceColor(confidence),
+                          color: _getConfidenceColor(confidence * 100),
                         ),
                       ),
                     ],
